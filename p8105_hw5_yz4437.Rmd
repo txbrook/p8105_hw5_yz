@@ -77,6 +77,26 @@ This plot suggests high within-subject correlation -- subjects who start above a
 
 ## Problem 2
 
+Read raw data
+```{r}
+homicide_data = read_csv("data/homicide-data.csv")
+```
+
+
+```{r}
+homicide_data = homicide_data %>% 
+  mutate(
+    city_state = str_c(city, state, sep = ", ")
+    ) 
+homicide_data %>% 
+  group_by(city_state) %>% 
+  summarise(
+    total = n(),
+    unsolved = sum(disposition %in% c("Closed without arrest","Open/No arrest"))
+    )
+```
+
+
 ## Problem 3
 
 set up fixed design elements
