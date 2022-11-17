@@ -98,7 +98,7 @@ homicide_tidy = homicide_data %>%
 homicide_tidy
 ```
 
-For the city of Baltimore, MD, `prop` is output of prop.test. 
+For the city of Baltimore, MD, the proportion of homicides `prop` is output of prop.test. 
 ```{r}
 baltimore = homicide_tidy %>% 
   filter(city_state == "Baltimore, MD")
@@ -107,17 +107,17 @@ prop = prop.test(baltimore$unsolved, baltimore$total)
 ```
 the estimated proportion:
 ```{r}
-broom::tidy(prop) %>% pull(estimate) %>% round(3)
+broom::tidy(prop) %>% pull(estimate)
 ```
 confidence intervals:
 ```{r}
-lower_bound = broom::tidy(prop) %>% pull(conf.low) %>% round(3)
-upper_bound = broom::tidy(prop) %>% pull(conf.high) %>% round(3)
+lower_bound = broom::tidy(prop) %>% pull(conf.low)
+upper_bound = broom::tidy(prop) %>% pull(conf.high)
 str_c(lower_bound, upper_bound, sep = ",")
 
 ```
 
-a function `prop_t` for get estimated proportion and confidence intervals by prop.test. 
+a function `prop_t` for return estimated proportion and confidence intervals by prop.test. 
 ```{r}
 prop_t = function(data){
   prop = prop.test(data$unsolved, data$total)
@@ -195,7 +195,7 @@ sim_result =
     mu = 1:6
     )%>%
   mutate(
-    output = map(.x = mu, ~rerun(5000, sim_p(mu = .x))),
+    output = map(.x = mu, ~rerun(5000, sim(mu = .x))),
     result = map(output, bind_rows) 
     )%>%
   select(-output) %>%
@@ -223,7 +223,7 @@ sim_result %>%
 ```
 By plot, with the true $\mu$ increase, which mean effect size increases, the power increases and approaching 1.
 
-a plot  shows the average estimate of $\hat{\mu}$ and the average estimate of $\hat{\mu}$ only in samples for which the null was rejected with the true $\mu$.
+a plot that shows the average estimate of $\hat{\mu}$ and the average estimate of $\hat{\mu}$ only in samples for which the null was rejected with the true $\mu$.
 ```{r}
 all_mu = sim_result %>% 
   group_by(mu) %>% 
