@@ -84,17 +84,52 @@ homicide_data = read_csv("data/homicide-data.csv")
 
 
 ```{r}
-homicide_data = homicide_data %>% 
+homicide_data
+```
+
+
+```{r}
+homicide_tidy = homicide_data %>% 
   mutate(
     city_state = str_c(city, state, sep = ", ")
-    ) 
-homicide_data %>% 
+    ) %>% 
   group_by(city_state) %>% 
   summarise(
     total = n(),
     unsolved = sum(disposition %in% c("Closed without arrest","Open/No arrest"))
     )
+homicide_tidy
 ```
+```{r}
+prop_t = function(data){
+  prop = prop.test(data$unsolved, data$total)
+  
+  broom::tidy(prop) %>% 
+    select(estimate, conf.low, conf.high)
+}
+```
+
+
+```{r}
+unsolved = homicide_tidy %>% 
+  filter(city_state == "Baltimore, MD") %>% 
+  pull(unsolved)
+total = homicide_tidy %>% 
+  filter(city_state == "Baltimore, MD") %>%
+  pull(total)
+prop = prop.test(unsolved, total)
+
+broom::tidy(prop)%>% pull(estimate) %>% round(3)
+
+lower_bound = broom::tidy(prop) %>% pull(conf.low) %>% round(3)
+upper_bound = broom::tidy(prop) %>% pull(conf.high) %>% round(3)
+str_c(lower_bound, upper_bound, sep = ",")
+
+```
+
+
+
+
 
 
 ## Problem 3
