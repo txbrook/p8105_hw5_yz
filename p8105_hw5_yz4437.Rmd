@@ -80,14 +80,11 @@ This plot suggests high within-subject correlation -- subjects who start above a
 Read raw data
 ```{r}
 homicide_data = read_csv("data/homicide-data.csv")
-```
-
-
-```{r}
 homicide_data
 ```
+The raw data set has `r nrow(homicide_data)` homicides in 50 large US cities and  `r ncol(homicide_data)` variables, which are  id of the killing, the reported date, first name, last name, race, age and sex of each victim, city, state, latitude and longitude of location and whether have arrestn.
 
-
+create a `city_state` variable and summarizes within cities to obtain the total number of homicides and the number of unsolved homicides. `city_state` is combined by str_c() function wil ",".  summarize within cities and show the total number of homicides and the number of unsolved homicides.
 ```{r}
 homicide_tidy = homicide_data %>% 
   mutate(
@@ -100,6 +97,27 @@ homicide_tidy = homicide_data %>%
     )
 homicide_tidy
 ```
+
+For the city of Baltimore, MD, `prop` is output of prop.test. 
+```{r}
+baltimore = homicide_tidy %>% 
+  filter(city_state == "Baltimore, MD")
+
+prop = prop.test(baltimore$unsolved, baltimore$total)
+```
+the estimated proportion:
+```{r}
+broom::tidy(prop) %>% pull(estimate) %>% round(3)
+```
+confidence intervals:
+```{r}
+lower_bound = broom::tidy(prop) %>% pull(conf.low) %>% round(3)
+upper_bound = broom::tidy(prop) %>% pull(conf.high) %>% round(3)
+str_c(lower_bound, upper_bound, sep = ",")
+
+```
+
+a function `prop_t` for get estimated proportion and confidence intervals by prop.test. 
 ```{r}
 prop_t = function(data){
   prop = prop.test(data$unsolved, data$total)
@@ -109,42 +127,47 @@ prop_t = function(data){
 }
 ```
 
-
+do prop.test for each of the cities. nest the `total` and `unsolved` and then map the result from prop.test.
 ```{r}
-unsolved = homicide_tidy %>% 
-  filter(city_state == "Baltimore, MD") %>% 
-  pull(unsolved)
-total = homicide_tidy %>% 
-  filter(city_state == "Baltimore, MD") %>%
-  pull(total)
-prop = prop.test(unsolved, total)
-
-broom::tidy(prop)%>% pull(estimate) %>% round(3)
-
-lower_bound = broom::tidy(prop) %>% pull(conf.low) %>% round(3)
-upper_bound = broom::tidy(prop) %>% pull(conf.high) %>% round(3)
-str_c(lower_bound, upper_bound, sep = ",")
-
+prop_city = 
+  nest(homicide_tidy, data = total:unsolved) %>% 
+  mutate(
+    unsolved = map(.$data, prop_t)) %>%
+  unnest(unsolved) %>% 
+  select(-data)
+prop_city
 ```
 
+a plot that shows the estimates and CIs for each city.
 
+```{r}
+  prop_city %>% 
+  # Organize cities according to the proportion of unsolved homicide.
+  mutate(city_state = fct_reorder(city_state, estimate)) %>% 
 
-
+  ggplot(aes(x = city_state, y = estimate))+
+  geom_point()+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high))+
+  labs(title = "Proportion of unsolved homicides in 50 large U.S. cities", 
+       x = "City, State", 
+       y = "Proportion", 
+       caption = "Error bars shows 95% confidence interval")+
+  theme(axis.text.x = element_text(angle = 90,hjust = 1))
+```
 
 
 ## Problem 3
 
-set up fixed design elements
+set up fixed design elements and set mu
 ```{r}
 n = 30
 sigma = 5
 mu = 0
-
 ```
 
-
+a function `sim` to generate a normal distribution with given mu with fixed n and sigma, then performing a t test for $\mu$ = 0 at 0.05 significance level and return the estimated mu and p-value.
 ```{r}
-sim_p = function(mu) {
+sim = function(mu) {
   
   sim_data = tibble(x = rnorm(n, mu, sigma))
   
@@ -156,16 +179,11 @@ sim_p = function(mu) {
 
 ```
 
-
-Generate 5000 datasets from the model
+Generate 5000 datasets from the model by run sim() 5000 times
 ```{r}
-output = vector("list", length = 5000)
-
-for (i in 1:5000) {
-  output[[i]] = sim_p(mu)
-}
-ds_es_p = bind_rows(output)
-ds_es_p
+result_0 = rerun(5000, sim(mu)) %>%
+bind_rows
+result_0
 ```
 
 
@@ -177,14 +195,15 @@ sim_result =
     mu = 1:6
     )%>%
   mutate(
-    output = map(.x =mu, ~rerun(5000, sim_p(mu = .x))),
-    estimate = map(output, bind_rows) ) %>%
+    output = map(.x = mu, ~rerun(5000, sim_p(mu = .x))),
+    result = map(output, bind_rows) 
+    )%>%
   select(-output) %>%
-  unnest(estimate)
+  unnest(result)
 ```
 
 
-
+a plot showing the proportion of times the null was rejected (the power of the test) with the true value of $\mu$.
 ```{r}
 sim_result %>%  
   group_by(mu) %>% 
@@ -202,7 +221,9 @@ sim_result %>%
     y = "Proportion of times the null was rejected"
   )
 ```
+By plot, with the true $\mu$ increase, which mean effect size increases, the power increases and approaching 1.
 
+a plot  shows the average estimate of $\hat{\mu}$ and the average estimate of $\hat{\mu}$ only in samples for which the null was rejected with the true $\mu$.
 ```{r}
 all_mu = sim_result %>% 
   group_by(mu) %>% 
@@ -217,7 +238,7 @@ reject_mu = sim_result %>%
         avg_reject_est = mean(estimate)
       )
 plot_mu = all_mu %>% 
-  left_join(reject_mu) %>% 
+  left_join(reject_mu, by = "mu") %>% 
 pivot_longer(
     2:3,
     names_to = "all_or_reject",
@@ -229,11 +250,19 @@ pivot_longer(
   geom_point()+
   geom_path()+
   labs(
+    title = "average estimate of mu_hat on the y axis and the true value of mu",
     x = "True mu",
     y = "Average estimate of mu_hat"
   )
 plot_mu      
 ```
+
+the sample average of $\hat{\mu}$ across tests for which the null is rejected approximately equal to the true value of ${\mu}$ when effect size of the test is large about 5.
+
+the sample average of $\hat{\mu}$ across tests for which the null is rejected approximately not equal to the true value of ${\mu}$ when effect size of the test is less about 5. 
+
+This is because when power of a hypothesis test is small, The estimates significantly different from the null hypothesis $\mu =0$ also have a big difference from the true mu. However, when the power of the test becomes stronger, The proportion of case be rejected is increasing, then the average of $\hat{\mu}$ across tests for which the null is rejected approaches mu of all samples.
+
 
 
 
